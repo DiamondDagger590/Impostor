@@ -66,6 +66,11 @@ namespace Impostor.Server.Net.Manager
             return game;
         }
 
+        public IEventManager GetManager()
+        {
+            return _eventManager;
+        }
+
         public IEnumerable<IGame> FindListings(MapFlags map, int impostorCount, GameKeywords language, int count = 10)
         {
             var results = 0;

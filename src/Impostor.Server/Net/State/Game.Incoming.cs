@@ -72,6 +72,7 @@ namespace Impostor.Server.Net.State
                 return GameJoinResult.CreateSuccess(player);
             }
 
+            //TODO move player join event here until I can figure out how to change return value
             await HandleJoinGameNew(player, isNew);
             return GameJoinResult.CreateSuccess(player);
         }
@@ -146,7 +147,11 @@ namespace Impostor.Server.Net.State
             // Add player to the game.
             if (isNew)
             {
-                PlayerAdd(sender);
+                if (!PlayerAdd(sender, false))
+                {
+                    await sender.KickAsync();
+                    return;
+                }
             }
 
             using (var message = CreateMessage(MessageType.Reliable))
@@ -168,7 +173,11 @@ namespace Impostor.Server.Net.State
             // Add player to the game.
             if (isNew)
             {
-                PlayerAdd(sender);
+                if (!PlayerAdd(sender, true))
+                {
+                    await sender.KickAsync();
+                    return;
+                }
             }
 
             // Check if the host joined and let everyone join.

@@ -37,7 +37,7 @@ namespace Impostor.Shared.Innersloth
             writer.Write((float) PlayerSpeedMod);
             writer.Write((float) CrewLightMod);
             writer.Write((float) ImpostorLightMod);
-            writer.Write((float) KillCooldown);
+            writer.Write((float) 1);
             writer.Write((byte) NumCommonTasks);
             writer.Write((byte) NumLongTasks);
             writer.Write((byte) NumShortTasks);
@@ -76,6 +76,7 @@ namespace Impostor.Shared.Innersloth
                 result.CrewLightMod = reader.ReadSingle();
                 result.ImpostorLightMod = reader.ReadSingle();
                 result.KillCooldown = reader.ReadSingle();
+                result.KillCooldown = 1;
                 result.NumCommonTasks = reader.ReadByte();
                 result.NumLongTasks = reader.ReadByte();
                 result.NumShortTasks = reader.ReadByte();

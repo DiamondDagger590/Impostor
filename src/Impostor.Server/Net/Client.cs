@@ -1,8 +1,11 @@
 using System;
 using System.Threading.Tasks;
 using Impostor.Server.Data;
+using Impostor.Server.Events.Players;
 using Impostor.Server.Games;
 using Impostor.Server.Games.Managers;
+using Impostor.Server.Net.Data;
+using Impostor.Server.Net.GameData;
 using Impostor.Server.Net.Manager;
 using Impostor.Server.Net.Messages;
 using Impostor.Shared.Innersloth;
@@ -136,9 +139,105 @@ namespace Impostor.Server.Net
                 case MessageFlags.GameData:
                 case MessageFlags.GameDataTo:
                 {
+                    Logger.Information("Game Data: " + (flag == MessageFlags.GameData) + " " +
+                                       (flag == MessageFlags.GameDataTo));
+
                     if (!IsPacketAllowed(reader, false))
                     {
                         return;
+                    }
+
+                    // Create a new reader. I'm not sure how exactly this works as I know 0 C# but yolo
+                    var reader2 = message.CreateReader();
+                    // Observed breaking with any length lower, so use this for now
+                    if (reader2.Length >= 5)
+                    {
+                        // We want to store the gamecode in an arry for usage later. We don't *really* care about it currently, but it's here if we end up needing it
+                        byte[] gameCode = new byte[4];
+
+                        for (int i = 0; i < 4; i++)
+                        {
+                            gameCode[i] = reader2.ReadByte();
+                        }
+
+                        // while (reader2.Position < reader2.Length) //This is here because sometimes the packet can have multiple sub packets? I've yet to observe this and it's yet to break so keeping it commented until it breaks
+                        {
+                            var length = reader2.ReadByte() + (reader2.ReadByte() << 8);
+                            Logger.Information("Length of packet: " + length);
+
+                            var type = reader2.ReadByte();
+                            Logger.Information("Type: " + type);
+
+                            switch (type)
+                            {
+                                case 1: // Data
+
+                                    var dataType = reader2.ReadByte();
+
+                                    switch (dataType)
+                                    {
+                                        case DataFlags.Movement:
+                                            reader2.ReadByte();
+                                            reader2.ReadByte();
+
+                                            var data06Movement = new Data06Movement(reader2);
+
+                                            var playerMoveEvent = new PlayerMoveEvent(Player.Game, Player, data06Movement);
+                                            await (this._gameManager as GameManager).GetManager().CallAsync(playerMoveEvent);
+
+                                            break;
+                                        default:
+                                            // Handle things like movement packets here in the future
+                                            for (int i = 0; i < length; i++)
+                                            {
+                                                Logger.Information("" + reader2.ReadByte());
+                                            }
+
+                                            break;
+                                    }
+
+                                    break;
+                                case 2: // RPC
+
+                                    // Grab the net ID. We don't need it for anything at this stage but store it in case
+                                    var netID = reader2.ReadByte();
+                                    Logger.Information("Net ID: " + netID);
+
+                                    var rpcType = reader2.ReadByte();
+
+                                    Logger.Information("RPC Type: " + rpcType);
+
+                                    switch (rpcType)
+                                    {
+                                        case GameDataFlags.SyncSettings:
+                                            GameData02SyncSettings gameData02ChangeSettings =
+                                                new GameData02SyncSettings(reader2, length, netID);
+
+                                            Logger.Information("Player Speed: " + gameData02ChangeSettings.PlayerSpeed +
+                                                               ", Emergency Meetings: " +
+                                                               gameData02ChangeSettings.EmergencyMeetings +
+                                                               ", Emergency Cooldown: " +
+                                                               gameData02ChangeSettings.EmergencyCooldown);
+                                            break;
+                                        case GameDataFlags.ReportDeadBody:
+                                            GameData11ReportDeadBody gameData11ReportDeadBody =
+                                                new GameData11ReportDeadBody(reader2, length, netID);
+
+                                            Logger.Information("Reported Body: " + gameData11ReportDeadBody.ReportedPlayer);
+                                            break;
+                                        default:
+                                            // Clean off reader
+                                            for (int i = 0; i < length - 1; i++)
+                                            {
+                                                reader2.ReadByte();
+                                            }
+
+                                            break;
+                                    }
+
+                                    break;
+                            }
+                        }
                     }
 
                     // Broadcast packet to all other players.
@@ -147,6 +246,15 @@ namespace Impostor.Server.Net
                     if (flag == MessageFlags.GameDataTo)
                     {
                         var target = reader.ReadPackedInt32();
+
+                        if (Player.Game.TryGetPlayer(target, out var playerTarget))
+                        {
+                            Logger.Information("Caller: " + Player.Client.Name + " Target: " +
+                                               playerTarget.Client.Name);
+                        }
+
+                        Logger.Information("Game Data To Message: " + message.CreateReader().ReadPackedInt32());
+
                         reader.CopyTo(writer);
                         await writer.SendToAsync(target);
                     }

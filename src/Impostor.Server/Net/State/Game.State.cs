@@ -1,6 +1,8 @@
 ﻿using System.Linq;
 using System.Threading.Tasks;
+using Impostor.Server.Events.Players;
 using Impostor.Server.Exceptions;
+using Impostor.Server.Net.Manager;
 using Impostor.Server.Net.Messages;
 using Impostor.Shared.Innersloth.Data;
 
@@ -8,7 +10,7 @@ namespace Impostor.Server.Net.State
 {
     internal partial class Game
     {
-        private void PlayerAdd(IClientPlayer player)
+        private bool PlayerAdd(IClientPlayer player, bool rejoining)
         {
             // Store player.
             if (!_players.TryAdd(player.Client.Id, player))
@@ -16,11 +18,23 @@ namespace Impostor.Server.Net.State
                 throw new AmongUsException("Failed to add player to game.");
             }
 
+            var playerJoinGameEvent = new PlayerJoinGameEvent(this, player, rejoining);
+            (this._gameManager as GameManager).GetManager().CallAsync(playerJoinGameEvent);
+
+            Logger.Information("Called Join Event. Cancelled Status: " + playerJoinGameEvent.IsCancelled);
+            if (playerJoinGameEvent.IsCancelled)
+            {
+                Logger.Information("Player Join Event Cancelled.");
+                return false;
+            }
+
             // Assign hostId if none is set.
             if (HostId == -1)
             {
                 HostId = player.Client.Id;
             }
+
+            return true;
         }
 
         private async ValueTask<bool> PlayerRemove(int playerId, bool isBan = false)

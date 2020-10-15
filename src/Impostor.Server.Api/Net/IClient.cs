@@ -24,7 +24,7 @@ namespace Impostor.Server.Net
         /// <remarks>
         ///     The name is provided by the player and should not be used to store persisted data.
         /// </remarks>
-        string Name { get; }
+        string Name { get; set; }
 
         /// <summary>
         ///     Gets the connection of the client.
